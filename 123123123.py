@@ -1,133 +1,211 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from sklearn.decomposition import PCA
-import umap
-import plotly.express as px
-import seaborn as sns
 import matplotlib.pyplot as plt
-from sklearn.feature_selection import SelectKBest, f_classif
+import seaborn as sns
+from sklearn.decomposition import PCA
+from sklearn.manifold import umap_ as UMAP
 from sklearn.model_selection import train_test_split
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.feature_selection import SelectKBest, f_classif
+from sklearn.impute import SimpleImputer
 
-st.title('Εφαρμογή Εξόρυξης και Ανάλυσης Δεδομένων')
+# Title of the application
+st.title("Data Mining and Analysis Application")
 
-# Sidebar for data upload
-st.sidebar.header('Φόρτωση Δεδομένων')
-uploaded_file = st.sidebar.file_uploader('Επιλέξτε ένα αρχείο CSV/Excel/TSV', type=['csv', 'xlsx', 'tsv'])
+# Data Loading
+st.header("Data Loading")
+uploaded_files = st.file_uploader("Choose two files", type=["csv", "xlsx", "tsv"], accept_multiple_files=True)
+if len(uploaded_files) == 2:
+    data1 = None
+    data2 = None
 
-if uploaded_file:
-    # Load data
-    if uploaded_file.name.endswith('.csv'):
-        df = pd.read_csv(uploaded_file)
-    elif uploaded_file.name.endswith('.xlsx'):
-        df = pd.read_excel(uploaded_file)
-    elif uploaded_file.name.endswith('.tsv'):
-        df = pd.read_csv(uploaded_file, delimiter='\t')
-
-    st.write('### Δεδομένα')
-    st.write(df.head())
-
-    # Check if the dataframe meets the requirements
-    if df.shape[1] < 2:
-        st.error('Ο πίνακας πρέπει να έχει τουλάχιστον δύο στήλες.')
+    if uploaded_files[0].name.endswith('csv'):
+        data1 = pd.read_csv(uploaded_files[0])
+    elif uploaded_files[0].name.endswith('xlsx'):
+        data1 = pd.read_excel(uploaded_files[0])
     else:
-        st.sidebar.header('Visualization Tab')
-        if st.sidebar.checkbox('Εμφάνιση 2D/3D Visualization'):
-            st.write('## Visualization Tab')
+        data1 = pd.read_csv(uploaded_files[0], sep='\t')
 
-            # PCA 2D
-            pca = PCA(n_components=2)
-            pca_result = pca.fit_transform(df.iloc[:, :-1])
-            pca_df = pd.DataFrame(data=pca_result, columns=['PCA1', 'PCA2'])
-            pca_df['label'] = df.iloc[:, -1]
-            fig1 = px.scatter(pca_df, x='PCA1', y='PCA2', color='label')
-            st.plotly_chart(fig1, use_container_width=True)
+    if uploaded_files[1].name.endswith('csv'):
+        data2 = pd.read_csv(uploaded_files[1])
+    elif uploaded_files[1].name.endswith('xlsx'):
+        data2 = pd.read_excel(uploaded_files[1])
+    else:
+        data2 = pd.read_csv(uploaded_files[1], sep='\t')
 
-            # UMAP 3D
-            reducer = umap.UMAP(n_components=3)
-            umap_result = reducer.fit_transform(df.iloc[:, :-1])
-            umap_df = pd.DataFrame(data=umap_result, columns=['UMAP1', 'UMAP2', 'UMAP3'])
-            umap_df['label'] = df.iloc[:, -1]
-            fig2 = px.scatter_3d(umap_df, x='UMAP1', y='UMAP2', z='UMAP3', color='label')
-            st.plotly_chart(fig2, use_container_width=True)
+    st.write("Data Loaded Successfully!")
+    st.write("Dataset 1:")
+    st.dataframe(data1)
+    st.write("Dataset 2:")
+    st.dataframe(data2)
 
-        st.sidebar.header('Feature Selection Tab')
-        if st.sidebar.checkbox('Εμφάνιση Feature Selection'):
-            st.write('## Feature Selection Tab')
-            k = st.slider('Επιλέξτε αριθμό χαρακτηριστικών', 1, df.shape[1] - 1, 5)
-            X = df.iloc[:, :-1]
-            y = df.iloc[:, -1]
-            selector = SelectKBest(f_classif, k=k)
-            X_new = selector.fit_transform(X, y)
-            selected_features = X.columns[selector.get_support()]
-            st.write(f'### Επιλεγμένα Χαρακτηριστικά: {selected_features.tolist()}')
-            reduced_df = pd.DataFrame(X_new, columns=selected_features)
-            reduced_df['label'] = y.values
-            st.write(reduced_df.head())
+    # Explicitly cast numeric columns
+    def ensure_numeric(df):
+        numeric_df = df.apply(pd.to_numeric, errors='coerce')
+        return numeric_df
 
-        st.sidebar.header('Classification Tab')
-        if st.sidebar.checkbox('Εμφάνιση Classification'):
-            st.write('## Classification Tab')
-            classifier_name = st.selectbox('Επιλέξτε αλγόριθμο', ['KNN', 'Random Forest'])
-            param = st.slider('Επιλέξτε παράμετρο αλγορίθμου', 1, 10, 5)
+    data1_numeric = ensure_numeric(data1)
+    data2_numeric = ensure_numeric(data2)
 
-            # Classification before feature selection
-            X = df.iloc[:, :-1]
-            y = df.iloc[:, -1]
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+    # Dataset selection
+    dataset_choice = st.selectbox("Choose dataset to analyze", ["Dataset 1", "Dataset 2"])
+    if dataset_choice == "Dataset 1":
+        data = data1_numeric
+    else:
+        data = data2_numeric
 
-            if classifier_name == 'KNN':
-                classifier = KNeighborsClassifier(n_neighbors=param)
-            elif classifier_name == 'Random Forest':
-                classifier = RandomForestClassifier(max_depth=param, random_state=42)
+    st.write(f"Selected {dataset_choice} for analysis.")
+    st.dataframe(data)
 
-            classifier.fit(X_train, y_train)
-            y_pred = classifier.predict(X_test)
-            acc = accuracy_score(y_test, y_pred)
+    # Preprocessing: Select only numeric columns
+    numeric_data = data.select_dtypes(include=[np.number])
+    num_features = numeric_data.shape[1]
+
+    st.write("Numeric Data for Analysis:")
+    st.dataframe(numeric_data)
+    st.write(f"Number of Numeric Features: {num_features}")
+
+    # Define X and y
+    X = numeric_data
+    y = data.iloc[:, -1]  # Assuming the last column is the label
+
+    # Handle missing values by imputation
+    imputer = SimpleImputer(strategy='mean')
+    X_imputed = imputer.fit_transform(X)
+
+    # Visualization Tab
+    st.header("Visualization Tab")
+
+    # PCA Visualization
+    st.subheader("PCA Visualization")
+    pca_option = st.selectbox("PCA Dimension", ["2D", "3D"])
+    if st.button("Generate PCA Visualization"):
+        if num_features >= 2:
+            if pca_option == "2D":
+                pca = PCA(n_components=2)
+                pca_result = pca.fit_transform(X_imputed)
+                plt.figure(figsize=(10, 6))
+                plt.scatter(pca_result[:, 0], pca_result[:, 1], c=y, cmap='viridis')
+                plt.title("PCA Result - 2D")
+                plt.xlabel("Principal Component 1")
+                plt.ylabel("Principal Component 2")
+                st.pyplot(plt)
+            elif pca_option == "3D":
+                if num_features >= 3:
+                    pca = PCA(n_components=3)
+                    pca_result = pca.fit_transform(X_imputed)
+                    fig = plt.figure(figsize=(10, 7))
+                    ax = fig.add_subplot(111, projection='3d')
+                    scatter = ax.scatter(pca_result[:, 0], pca_result[:, 1], pca_result[:, 2], c=y, cmap='viridis')
+                    plt.title("PCA Result - 3D")
+                    ax.set_xlabel("Principal Component 1")
+                    ax.set_ylabel("Principal Component 2")
+                    ax.set_zlabel("Principal Component 3")
+                    fig.colorbar(scatter)
+                    st.pyplot(fig)
+                else:
+                    st.write("Not enough features for 3D PCA. Ensure your data has at least 3 numeric features.")
+        else:
+            st.write("Not enough features for PCA. Ensure your data has at least 2 numeric features.")
+
+    # UMAP Visualization
+    st.subheader("UMAP Visualization")
+    umap_option = st.selectbox("UMAP Dimension", ["2D", "3D"])
+    if st.button("Generate UMAP Visualization"):
+        if num_features >= 2:
+            if umap_option == "2D":
+                umap_model = UMAP(n_components=2)
+                umap_result = umap_model.fit_transform(X_imputed)
+                plt.figure(figsize=(10, 6))
+                plt.scatter(umap_result[:, 0], umap_result[:, 1], c=y, cmap='viridis')
+                plt.title("UMAP Result - 2D")
+                plt.xlabel("UMAP Component 1")
+                plt.ylabel("UMAP Component 2")
+                st.pyplot(plt)
+            elif umap_option == "3D":
+                if num_features >= 3:
+                    umap_model = UMAP(n_components=3)
+                    umap_result = umap_model.fit_transform(X_imputed)
+                    fig = plt.figure(figsize=(10, 7))
+                    ax = fig.add_subplot(111, projection='3d')
+                    scatter = ax.scatter(umap_result[:, 0], umap_result[:, 1], umap_result[:, 2], c=y, cmap='viridis')
+                    plt.title("UMAP Result - 3D")
+                    ax.set_xlabel("UMAP Component 1")
+                    ax.set_ylabel("UMAP Component 2")
+                    ax.set_zlabel("UMAP Component 3")
+                    fig.colorbar(scatter)
+                    st.pyplot(fig)
+                else:
+                    st.write("Not enough features for 3D UMAP. Ensure your data has at least 3 numeric features.")
+        else:
+            st.write("Not enough features for UMAP. Ensure your data has at least 2 numeric features.")
+
+    # EDA Charts
+    st.header("Exploratory Data Analysis (EDA) Charts")
+
+    # Histogram of numeric features
+    st.subheader("Histogram of Numeric Features")
+    num_features_to_plot = st.multiselect("Select Numeric Features for Histogram", numeric_data.columns)
+    if num_features_to_plot:
+        for feature in num_features_to_plot:
+            plt.figure(figsize=(10, 6))
+            sns.histplot(numeric_data[feature], kde=True)
+            plt.title(f"Histogram of {feature}")
+            plt.xlabel(feature)
+            plt.ylabel("Frequency")
+            st.pyplot(plt)
+
+    # Pairplot of numeric features
+    st.subheader("Pairplot of Numeric Features")
+    if st.button("Generate Pairplot"):
+        if num_features >= 2:
+            pairplot_data = pd.concat([numeric_data, y.rename('target')], axis=1)
+            pairplot = sns.pairplot(pairplot_data, hue='target')
+            st.pyplot(pairplot)
+        else:
+            st.write("Not enough features for Pairplot. Ensure your data has at least 2 numeric features.")
+
+    # Machine Learning Tabs
+    st.header("Machine Learning Tabs")
+    feature_selection_tab = st.selectbox("Select Feature Selection Method", ["SelectKBest"])
+    num_features_to_select = st.number_input("Number of Features to Select", min_value=1, max_value=num_features)
+
+    if st.button("Run Feature Selection"):
+        if feature_selection_tab == "SelectKBest":
+            selector = SelectKBest(score_func=f_classif, k=num_features_to_select)
+            X_selected = selector.fit_transform(X_imputed, y)
+            st.write("Selected Features:")
+            st.dataframe(pd.DataFrame(X_selected, columns=[f'Feature {i+1}' for i in range(X_selected.shape[1])]))
+
+    # Classification Algorithms
+    st.header("Classification Algorithms")
+    algorithm = st.selectbox("Select Algorithm", ["KNN"])
+    k_value = st.number_input("Enter the value of k for KNN", min_value=1)
+
+    if st.button("Run Classification"):
+        if algorithm == "KNN":
+            X_train, X_test, y_train, y_test = train_test_split(X_imputed, y, test_size=0.2, random_state=42)
+            knn = KNeighborsClassifier(n_neighbors=k_value)
+            knn.fit(X_train, y_train)
+            y_pred = knn.predict(X_test)
+
+            accuracy = accuracy_score(y_test, y_pred)
             f1 = f1_score(y_test, y_pred, average='weighted')
-            roc_auc = roc_auc_score(y_test, classifier.predict_proba(X_test), multi_class='ovr')
+            if len(np.unique(y_test)) == 2:  # Check if binary classification
+                roc_auc = roc_auc_score(y_test, knn.predict_proba(X_test)[:, 1])
+                st.write(f"ROC AUC: {roc_auc}")
+            else:
+                st.write("ROC AUC is not applicable for multiclass classification.")
 
-            st.write('### Πριν την Επιλογή Χαρακτηριστικών')
-            st.write(f'Ακρίβεια: {acc}')
-            st.write(f'F1-Score: {f1}')
-            st.write(f'ROC-AUC: {roc_auc}')
+            st.write(f"Accuracy: {accuracy}")
+            st.write(f"F1 Score: {f1}")
 
-            # Classification after feature selection
-            X_new = reduced_df.iloc[:, :-1]
-            y_new = reduced_df.iloc[:, -1]
-            X_train_new, X_test_new, y_train_new, y_test_new = train_test_split(X_new, y_new, test_size=0.3,
-                                                                                random_state=42)
-
-            classifier.fit(X_train_new, y_train_new)
-            y_pred_new = classifier.predict(X_test_new)
-            acc_new = accuracy_score(y_test_new, y_pred_new)
-            f1_new = f1_score(y_test_new, y_pred_new, average='weighted')
-            roc_auc_new = roc_auc_score(y_test_new, classifier.predict_proba(X_test_new), multi_class='ovr')
-
-            st.write('### Μετά την Επιλογή Χαρακτηριστικών')
-            st.write(f'Ακρίβεια: {acc_new}')
-            st.write(f'F1-Score: {f1_new}')
-            st.write(f'ROC-AUC: {roc_auc_new}')
-
-        st.sidebar.header('Info Tab')
-        if st.sidebar.checkbox('Εμφάνιση Info Tab'):
-            st.write('## Info Tab')
-            st.write('Αυτή είναι μια εφαρμογή για εξόρυξη και ανάλυση δεδομένων.')
-            st.write('### Ομάδα Ανάπτυξης')
-            st.write('Μέλος 1: Υλοποίηση της φόρτωσης δεδομένων και της οπτικοποίησης')
-            st.write('Μέλος 2: Υλοποίηση της επιλογής χαρακτηριστικών και της κατηγοριοποίησης')
-            st.write('Μέλος 3: Υλοποίηση του Docker και GitHub, σύνταξη της έκθεσης')
-
-# Save the report to LaTeX, UML diagram, and describe the software lifecycle model
-st.sidebar.header('Άλλα')
-if st.sidebar.button('Δημιουργία Έκθεσης'):
-    st.write('Η έκθεση θα δημιουργηθεί και θα αποθηκευτεί.')
-
-if st.sidebar.button('Δημιουργία UML Διαγράμματος'):
-    st.write('Το UML διάγραμμα θα δημιουργηθεί και θα αποθηκευτεί.')
-
-if st.sidebar.button('Περιγραφή Κύκλου Ζωής Λογισμικού'):
-    st.write('Θα περιγραφεί ο κύκλος ζωής της έκδοσης του λογισμικού.')
+# Info Tab
+st.header("Information")
+st.write("This application was developed by the Data Science Team.")
+st.write("Team Members:")
+st.write("- Member 1: Data Loading and Visualization")
+st.write("- Member 2: Machine Learning Implementation")
+st.write("- Member 3: Application Design and Deployment")
