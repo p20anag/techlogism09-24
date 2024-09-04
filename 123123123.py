@@ -145,28 +145,6 @@ if len(uploaded_files) == 2:
     # EDA Charts
     st.header("Exploratory Data Analysis (EDA) Charts")
 
-    # Histogram of numeric features
-    st.subheader("Histogram of Numeric Features")
-    num_features_to_plot = st.multiselect("Select Numeric Features for Histogram", numeric_data.columns)
-    if num_features_to_plot:
-        for feature in num_features_to_plot:
-            plt.figure(figsize=(10, 6))
-            sns.histplot(numeric_data[feature], kde=True)
-            plt.title(f"Histogram of {feature}")
-            plt.xlabel(feature)
-            plt.ylabel("Frequency")
-            st.pyplot(plt)
-
-    # Pairplot of numeric features
-    st.subheader("Pairplot of Numeric Features")
-    if st.button("Generate Pairplot"):
-        if num_features >= 2:
-            pairplot_data = pd.concat([numeric_data, y.rename('target')], axis=1)
-            pairplot = sns.pairplot(pairplot_data, hue='target')
-            st.pyplot(pairplot)
-        else:
-            st.write("Not enough features for Pairplot. Ensure your data has at least 2 numeric features.")
-
     # Machine Learning Tabs
     st.header("Machine Learning Tabs")
     feature_selection_tab = st.selectbox("Select Feature Selection Method", ["SelectKBest"])
