@@ -168,5 +168,5 @@ elif task == "Classification Algorithms":
 elif task == "Information":
     st.header("Information")
     st.write("Team Members: George Anagnostou")
-    st.write("- Member 1: Data Loading and Visualization")
+    st.write("George Anagnostou: Sole creator")
 
