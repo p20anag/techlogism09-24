@@ -1,189 +1,172 @@
+# Streamlit app template for common tasks
 import streamlit as st
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.decomposition import PCA
-from sklearn.manifold import umap_ as UMAP
-from sklearn.model_selection import train_test_split
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
 from sklearn.feature_selection import SelectKBest, f_classif
-from sklearn.impute import SimpleImputer
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
-# Title of the application
-st.title("Data Mining and Analysis Application")
+# Title of the app
+st.title("Software Technology - Streamlit App")
 
-# Data Loading
-st.header("Data Loading")
-uploaded_files = st.file_uploader("Choose two files", type=["csv", "xlsx", "tsv"], accept_multiple_files=True)
-if len(uploaded_files) == 2:
-    data1 = None
-    data2 = None
+# Sidebar for selecting tasks
+task = st.sidebar.selectbox("Select Task",
+                            ["File Upload",
+                             "Data Analysis",
+                             "Data Visualization",
+                             "Feature Selection",
+                             "Classification Algorithms",
+                             "Information"])
 
-    if uploaded_files[0].name.endswith('csv'):
-        data1 = pd.read_csv(uploaded_files[0])
-    elif uploaded_files[0].name.endswith('xlsx'):
-        data1 = pd.read_excel(uploaded_files[0])
-    else:
-        data1 = pd.read_csv(uploaded_files[0], sep='\t')
+# Task 1: File Upload
+if task == "File Upload":
+    st.header("File Upload")
+    uploaded_file = st.file_uploader("Upload a CSV File", type=["csv"])
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        st.write("Data Preview:", df.head())
 
-    if uploaded_files[1].name.endswith('csv'):
-        data2 = pd.read_csv(uploaded_files[1])
-    elif uploaded_files[1].name.endswith('xlsx'):
-        data2 = pd.read_excel(uploaded_files[1])
-    else:
-        data2 = pd.read_csv(uploaded_files[1], sep='\t')
+# Task 2: Data Analysis
+elif task == "Data Analysis":
+    st.header("Data Analysis")
 
-    st.write("Data Loaded Successfully!")
-    st.write("Dataset 1:")
-    st.dataframe(data1)
-    st.write("Dataset 2:")
-    st.dataframe(data2)
+    # Upload data for analysis
+    uploaded_file = st.file_uploader("Upload a CSV File for Analysis", type=["csv"])
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
 
-    # Explicitly cast numeric columns
-    def ensure_numeric(df):
-        numeric_df = df.apply(pd.to_numeric, errors='coerce')
-        return numeric_df
+        # Ensure last column is the label and rest are features
+        st.write("**Data Specifications:**")
+        st.write(f"- Rows (S): {df.shape[0]}, Columns (F+1): {df.shape[1]}")
+        st.write("The last column is assumed to be the label (target).")
 
-    data1_numeric = ensure_numeric(data1)
-    data2_numeric = ensure_numeric(data2)
+        # Display data details
+        st.write("Basic Info:")
+        st.write(df.describe())  # Shows basic statistics of the data
 
-    # Dataset selection
-    dataset_choice = st.selectbox("Choose dataset to analyze", ["Dataset 1", "Dataset 2"])
-    if dataset_choice == "Dataset 1":
-        data = data1_numeric
-    else:
-        data = data2_numeric
+        # Information about data structure
+        st.write("Data Structure:")
+        st.write(df.info())  # Provides information about data types, nulls
 
-    st.write(f"Selected {dataset_choice} for analysis.")
-    st.dataframe(data)
+# Task 3: Data Visualization
+elif task == "Data Visualization":
+    st.header("Data Visualization")
+    uploaded_file = st.file_uploader("Upload a CSV File for Plotting", type=["csv"])
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        st.write("Columns in dataset:", df.columns.tolist())
+        x_col = st.selectbox("Choose X-axis column", df.columns)
+        y_col = st.selectbox("Choose Y-axis column", df.columns)
+        plt.figure(figsize=(10, 6))
+        plt.scatter(df[x_col], df[y_col])
+        plt.xlabel(x_col)
+        plt.ylabel(y_col)
+        plt.title(f"Scatter plot of {x_col} vs {y_col}")
+        st.pyplot(plt)
 
-    # Preprocessing: Select only numeric columns
-    numeric_data = data.select_dtypes(include=[np.number])
-    num_features = numeric_data.shape[1]
+# Task 4: Feature Selection (Machine Learning Tab 1)
+elif task == "Feature Selection":
+    st.header("Feature Selection")
 
-    st.write("Numeric Data for Analysis:")
-    st.dataframe(numeric_data)
-    st.write(f"Number of Numeric Features: {num_features}")
+    # Upload data
+    uploaded_file = st.file_uploader("Upload a CSV File for Feature Selection", type=["csv"])
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        X = df.iloc[:, :-1]  # Features (all columns except last)
+        y = df.iloc[:, -1]  # Labels (last column)
 
-    # Define X and y
-    X = numeric_data
-    y = data.iloc[:, -1]  # Assuming the last column is the label
+        # Select number of features
+        num_features = st.slider("Select number of features to keep", 1, X.shape[1], 5)
 
-    # Handle missing values by imputation
-    imputer = SimpleImputer(strategy='mean')
-    X_imputed = imputer.fit_transform(X)
+        # Feature selection using ANOVA F-test
+        selector = SelectKBest(f_classif, k=num_features)
+        X_new = selector.fit_transform(X, y)
 
-    # Visualization Tab
-    st.header("Visualization Tab")
+        # Create a dataframe with selected features
+        selected_features = pd.DataFrame(X_new, columns=X.columns[selector.get_support()])
+        st.write("Dataset with reduced features:")
+        st.write(selected_features.head())
 
-    # PCA Visualization
-    st.subheader("PCA Visualization")
-    pca_option = st.selectbox("PCA Dimension", ["2D", "3D"])
-    if st.button("Generate PCA Visualization"):
-        if num_features >= 2:
-            if pca_option == "2D":
-                pca = PCA(n_components=2)
-                pca_result = pca.fit_transform(X_imputed)
-                plt.figure(figsize=(10, 6))
-                plt.scatter(pca_result[:, 0], pca_result[:, 1], c=y, cmap='viridis')
-                plt.title("PCA Result - 2D")
-                plt.xlabel("Principal Component 1")
-                plt.ylabel("Principal Component 2")
-                st.pyplot(plt)
-            elif pca_option == "3D":
-                if num_features >= 3:
-                    pca = PCA(n_components=3)
-                    pca_result = pca.fit_transform(X_imputed)
-                    fig = plt.figure(figsize=(10, 7))
-                    ax = fig.add_subplot(111, projection='3d')
-                    scatter = ax.scatter(pca_result[:, 0], pca_result[:, 1], pca_result[:, 2], c=y, cmap='viridis')
-                    plt.title("PCA Result - 3D")
-                    ax.set_xlabel("Principal Component 1")
-                    ax.set_ylabel("Principal Component 2")
-                    ax.set_zlabel("Principal Component 3")
-                    fig.colorbar(scatter)
-                    st.pyplot(fig)
-                else:
-                    st.write("Not enough features for 3D PCA. Ensure your data has at least 3 numeric features.")
-        else:
-            st.write("Not enough features for PCA. Ensure your data has at least 2 numeric features.")
-
-    # UMAP Visualization
-    st.subheader("UMAP Visualization")
-    umap_option = st.selectbox("UMAP Dimension", ["2D", "3D"])
-    if st.button("Generate UMAP Visualization"):
-        if num_features >= 2:
-            if umap_option == "2D":
-                umap_model = UMAP(n_components=2)
-                umap_result = umap_model.fit_transform(X_imputed)
-                plt.figure(figsize=(10, 6))
-                plt.scatter(umap_result[:, 0], umap_result[:, 1], c=y, cmap='viridis')
-                plt.title("UMAP Result - 2D")
-                plt.xlabel("UMAP Component 1")
-                plt.ylabel("UMAP Component 2")
-                st.pyplot(plt)
-            elif umap_option == "3D":
-                if num_features >= 3:
-                    umap_model = UMAP(n_components=3)
-                    umap_result = umap_model.fit_transform(X_imputed)
-                    fig = plt.figure(figsize=(10, 7))
-                    ax = fig.add_subplot(111, projection='3d')
-                    scatter = ax.scatter(umap_result[:, 0], umap_result[:, 1], umap_result[:, 2], c=y, cmap='viridis')
-                    plt.title("UMAP Result - 3D")
-                    ax.set_xlabel("UMAP Component 1")
-                    ax.set_ylabel("UMAP Component 2")
-                    ax.set_zlabel("UMAP Component 3")
-                    fig.colorbar(scatter)
-                    st.pyplot(fig)
-                else:
-                    st.write("Not enough features for 3D UMAP. Ensure your data has at least 3 numeric features.")
-        else:
-            st.write("Not enough features for UMAP. Ensure your data has at least 2 numeric features.")
-
-    # EDA Charts
-    st.header("Exploratory Data Analysis (EDA) Charts")
-
-    # Machine Learning Tabs
-    st.header("Machine Learning Tabs")
-    feature_selection_tab = st.selectbox("Select Feature Selection Method", ["SelectKBest"])
-    num_features_to_select = st.number_input("Number of Features to Select", min_value=1, max_value=num_features)
-
-    if st.button("Run Feature Selection"):
-        if feature_selection_tab == "SelectKBest":
-            selector = SelectKBest(score_func=f_classif, k=num_features_to_select)
-            X_selected = selector.fit_transform(X_imputed, y)
-            st.write("Selected Features:")
-            st.dataframe(pd.DataFrame(X_selected, columns=[f'Feature {i+1}' for i in range(X_selected.shape[1])]))
-
-    # Classification Algorithms
+# Task 5: Classification Algorithms (Machine Learning Tab 2)
+elif task == "Classification Algorithms":
     st.header("Classification Algorithms")
-    algorithm = st.selectbox("Select Algorithm", ["KNN"])
-    k_value = st.number_input("Enter the value of k for KNN", min_value=1)
 
-    if st.button("Run Classification"):
-        if algorithm == "KNN":
-            X_train, X_test, y_train, y_test = train_test_split(X_imputed, y, test_size=0.2, random_state=42)
-            knn = KNeighborsClassifier(n_neighbors=k_value)
-            knn.fit(X_train, y_train)
-            y_pred = knn.predict(X_test)
+    # Upload data
+    uploaded_file = st.file_uploader("Upload a CSV File for Classification", type=["csv"])
+    if uploaded_file:
+        df = pd.read_csv(uploaded_file)
+        X = df.iloc[:, :-1]  # Features (all columns except last)
+        y = df.iloc[:, -1]   # Labels (last column)
 
-            accuracy = accuracy_score(y_test, y_pred)
-            f1 = f1_score(y_test, y_pred, average='weighted')
-            if len(np.unique(y_test)) == 2:  # Check if binary classification
-                roc_auc = roc_auc_score(y_test, knn.predict_proba(X_test)[:, 1])
-                st.write(f"ROC AUC: {roc_auc}")
-            else:
-                st.write("ROC AUC is not applicable for multiclass classification.")
+        # Encode labels if needed
+        if y.dtype == 'object':
+            le = LabelEncoder()
+            y = le.fit_transform(y)
 
-            st.write(f"Accuracy: {accuracy}")
-            st.write(f"F1 Score: {f1}")
+        # Train/test split
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+        # Optionally perform feature selection
+        apply_feature_selection = st.checkbox("Apply Feature Selection")
+        if apply_feature_selection:
+            num_features = st.slider("Select number of features to keep", 1, X_train.shape[1], 5)
+            selector = SelectKBest(f_classif, k=num_features)
+            X_train = selector.fit_transform(X_train, y_train)
+            X_test = selector.transform(X_test)  # Apply the same transformation to the test set
+
+        # Standardize the features
+        scaler = StandardScaler()
+        X_train = scaler.fit_transform(X_train)
+        X_test = scaler.transform(X_test)
+
+        # Classifier 1: KNN
+        st.subheader("K-Nearest Neighbors (KNN)")
+        k = st.slider("Select value of k for KNN", 1, 20, 5)
+        knn = KNeighborsClassifier(n_neighbors=k)
+        knn.fit(X_train, y_train)
+        y_pred_knn = knn.predict(X_test)
+
+        # Metrics for KNN
+        acc_knn = accuracy_score(y_test, y_pred_knn)
+        f1_knn = f1_score(y_test, y_pred_knn, average='weighted')
+        roc_auc_knn = roc_auc_score(y_test, knn.predict_proba(X_test), multi_class='ovr')
+
+        st.write(f"**KNN Accuracy**: {acc_knn:.2f}")
+        st.write(f"**KNN F1-Score**: {f1_knn:.2f}")
+        st.write(f"**KNN ROC-AUC**: {roc_auc_knn:.2f}")
+
+        # Classifier 2: Random Forest
+        st.subheader("Random Forest")
+        n_estimators = st.slider("Select number of estimators for Random Forest", 10, 200, 100)
+        rf = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
+        rf.fit(X_train, y_train)
+        y_pred_rf = rf.predict(X_test)
+
+        # Metrics for Random Forest
+        acc_rf = accuracy_score(y_test, y_pred_rf)
+        f1_rf = f1_score(y_test, y_pred_rf, average='weighted')
+        roc_auc_rf = roc_auc_score(y_test, rf.predict_proba(X_test), multi_class='ovr')
+
+        st.write(f"**Random Forest Accuracy**: {acc_rf:.2f}")
+        st.write(f"**Random Forest F1-Score**: {f1_rf:.2f}")
+        st.write(f"**Random Forest ROC-AUC**: {roc_auc_rf:.2f}")
+
+        # Results comparison
+        st.subheader("Comparison of KNN and Random Forest")
+        comparison_df = pd.DataFrame({
+            'Metric': ['Accuracy', 'F1-Score', 'ROC-AUC'],
+            'KNN': [acc_knn, f1_knn, roc_auc_knn],
+            'Random Forest': [acc_rf, f1_rf, roc_auc_rf]
+        })
+        st.write(comparison_df)
+
 
 # Info Tab
-st.header("Information")
-st.write("This application was developed by the Data Science Team.")
-st.write("Team Members:")
-st.write("- Member 1: Data Loading and Visualization")
-st.write("- Member 2: Machine Learning Implementation")
-st.write("- Member 3: Application Design and Deployment")
+elif task == "Information":
+    st.header("Information")
+    st.write("Team Members: George Anagnostou")
+    st.write("- Member 1: Data Loading and Visualization")
+
