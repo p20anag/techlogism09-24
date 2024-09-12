@@ -1,0 +1,7 @@
+To run the app simply run  
+docker build -t tech-logism .
+docker build -t 123123123.
+docker run -p 8080:8080 123123123 
+
+Or run 
+streamlit run C:\**your-path-here**\123123123.py
