@@ -1,3 +1,5 @@
+Install Dockerfile and 123123123.py
+
 To run the app simply run  
 docker build -t tech-logism .
 docker build -t 123123123.
